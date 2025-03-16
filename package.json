@@ -1,0 +1,35 @@
+{
+    "name": "inzynierka-kontroler",
+    "version": "1.0.0",
+    "description": "",
+    "main": "kontroler.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "node kontroler.js",
+        "dev": "nodemon kontroler.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/TheR0ck3t/inzynierka-kontroler.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/TheR0ck3t/inzynierka-kontroler/issues"
+    },
+    "homepage": "https://github.com/TheR0ck3t/inzynierka-kontroler#readme",
+    "dependencies": {
+        "axios": "^1.8.2",
+        "dotenv": "^16.4.7",
+        "mqtt": "^5.10.4",
+        "nfc-pcsc": "^0.8.1",
+        "node-cron": "^3.0.3",
+        "rpi-gpio": "^2.1.7",
+        "serialport": "^13.0.0",
+        "winston": "^3.17.0"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.9"
+    }
+}
