@@ -23,10 +23,10 @@
         "axios": "^1.8.2",
         "dotenv": "^16.4.7",
         "mqtt": "^5.10.4",
-        "nfc-pcsc": "^0.8.1",
         "node-cron": "^3.0.3",
-        "rpi-gpio": "^2.1.7",
-        "serialport": "^13.0.0",
+        "node-gyp": "^11.1.0",
+        "rc522-rfid": "^14.1.10",
+        "save": "^2.9.0",
         "winston": "^3.17.0"
     },
     "devDependencies": {
