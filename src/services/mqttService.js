@@ -24,6 +24,20 @@ client.on('connect', () => {
     subscribeToTopics();
 });
 
+function subscribeToTopics() {
+    const topics = ['rfid/command', 'rfid/scan', 'rfid/secret_update', 'rfid/status'];
+    topics.forEach(topic => {
+        client.subscribe(topic, (err) => {
+            if (err) {
+                logger.error(`Błąd subskrypcji ${topic}: ${err.message}`);
+            } else {
+                logger.info(`Subskrybowano temat: ${topic}`);
+            }
+        });
+    });
+}
+
+
 client.on('message', (topic, message) => {
     const messageStr = message.toString();
     logger.info(`Otrzymano wiadomość MQTT na ${topic}: ${messageStr}`);
@@ -35,25 +49,17 @@ client.on('message', (topic, message) => {
         } catch (error) {
             logger.error(`Błąd parsowania JSON dla ${topic}: ${error.message}`);
         }
+    } else {
+        logger.warn(`Brak handlera dla topicu: ${topic}`);
     }
 });
+
 
 client.on('error', (error) => {
     logger.error(`Błąd MQTT: ${error.message}`);
 });
 
-function subscribeToTopics() {
-    const topics = ['rfid/command', 'rfid/scan', 'rfid/secret_update'];
-    topics.forEach(topic => {
-        client.subscribe(topic, (err) => {
-            if (err) {
-                logger.error(`Błąd subskrypcji ${topic}: ${err.message}`);
-            } else {
-                logger.info(`Subskrybowano temat: ${topic}`);
-            }
-        });
-    });
-}
+
 
 function registerHandler(topic, handler) {
     messageHandlers.set(topic, handler);

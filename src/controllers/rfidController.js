@@ -18,6 +18,9 @@ mqttService.registerHandler('rfid/scan', (data) => {
 mqttService.registerHandler('rfid/secret_update', (data) => {
     rfidHandler.handleSecretUpdate(data);
 });
+mqttService.registerHandler('rfid/status', (data) => {
+    rfidHandler.handleStatus(data);
+});
 
 logger.info('Kontroler RFID został zainicjalizowany pomyślnie');
 
