@@ -11,7 +11,7 @@ let deniedTags = [];
 setInterval(() => {
     if (mqttService) {
         const readers = readerRegistry.getAllReaders();
-        mqttService.publish('readers/list_update', { 
+        mqttService.publish('readers/list', { 
             readers: readers  // getAllReaders() już zwraca tablicę
         });
     }
@@ -32,7 +32,7 @@ setInterval(() => {
             
             // Również wyślij zaktualizowaną listę
             const readers = readerRegistry.getAllReaders();
-            mqttService.publish('readers/list_update', { 
+            mqttService.publish('readers/list', { 
                 readers: readers
             });
         }
