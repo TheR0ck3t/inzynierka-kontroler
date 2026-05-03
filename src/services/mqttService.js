@@ -25,7 +25,7 @@ client.on('connect', () => {
 });
 
 function subscribeToTopics() {
-    const topics = ['rfid/command', 'rfid/scan', 'rfid/secret_update', 'rfid/status'];
+    const topics = ['rfid/command', 'rfid/scan', 'rfid/secret_updated', 'rfid/status'];
     topics.forEach(topic => {
         client.subscribe(topic, (err) => {
             if (err) {
@@ -54,6 +54,36 @@ client.on('message', (topic, message) => {
     }
 });
 
+// Ensure secret_updated messages are forwarded to API as rotation confirmations
+client.on('message', (topic, message) => {
+    try {
+        if (topic === 'rfid/secret_updated') {
+            const payloadStr = message.toString();
+            let payload;
+            try {
+                payload = JSON.parse(payloadStr);
+            } catch (e) {
+                payload = { raw: payloadStr };
+            }
+
+            // Avoid forwarding messages we've already forwarded
+            if (payload.forwarded_by === 'controller') {
+                return;
+            }
+
+            // Attach small marker and forward to 'rfid/rotation' with QoS=1 so backend listeners reliably receive it
+            payload.forwarded_by = 'controller';
+            const out = JSON.stringify(payload);
+            client.publish('rfid/rotation', out, { qos: 1 }, (err) => {
+                if (err) logger.error(`Failed to forward secret_updated to rfid/rotation: ${err.message}`);
+                else logger.info('Forwarded secret_updated -> rfid/rotation (qos=1)');
+            });
+        }
+    } catch (err) {
+        logger.error(`Error in secret_updated forwarder: ${err.message}`);
+    }
+});
+
 
 client.on('error', (error) => {
     logger.error(`Błąd MQTT: ${error.message}`);
@@ -70,8 +100,6 @@ function publish(topic, payload, callback) {
     client.publish(topic, payloadStr, (err) => {
         if (err) {
             logger.error(`Błąd publikacji na ${topic}: ${err.message}`);
-        } else {
-            logger.info(`Publikowano wiadomość na ${topic}: ${payloadStr}`);
         }
         if (callback) callback(err);
     });

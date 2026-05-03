@@ -46,35 +46,27 @@ function init(_mqttService, _sessionManager) {
 }
 
 function handleRfidScan(data) {
-    const { uid, reader_name, device_id, mode, secret, secretWritten } = data;
+    const { uid, reader_name, device_id, mode, current_secret, new_secret } = data;
     
     // Rejestruj czytnik w registry
     if (device_id) {
         readerRegistry.registerReader(data);
     }
     
-    logger.info(`Odczytano tag ${uid} z czytnika ${reader_name} (${device_id}), tryb: ${mode || 'access'}, hasSecret: ${!!secret}, secretWritten: ${!!secretWritten}`);
+    logger.info(`Odczytano tag ${uid} z czytnika ${reader_name} (${device_id}), tryb: ${mode || 'access'}, hasCurrentSecret: ${!!current_secret}, hasNewSecret: ${!!new_secret}`);
     if (mode === 'enrollment') {
-        handleEnrollmentScan(uid, reader_name, { secret, secretWritten });
+        handleEnrollmentScan(uid, reader_name, { current_secret, new_secret });
     } else {
-        handleAccessScan(uid, reader_name, secret);
+        handleAccessScan(uid, reader_name, current_secret, new_secret);
     }
 }
 
 async function handleSecretUpdate(data) {
-    const { uid, reader_name, newSecret, action } = data;
-    logger.info(`Secret update request for ${uid}: ${newSecret}`);
-    if (action === 'update_secret' && newSecret) {
+    const { uid, reader_name, action = null, success, error = null } = data;
+
+    if ((action === null || action === 'update_secret') && success === true) {
         try {
-            const response = await axios.put(`${apiBaseUrl}/tags/secret-update/${uid}`, {
-                newSecret: newSecret
-            }, {
-                headers: {
-                    'x-controller-request': 'true',
-                    'x-mqtt-api-key': process.env.CONTROLLER_API_KEY
-                }
-            });
-            if (response.status === 200) {
+
                 logger.info(`Secret updated successfully for tag ${uid}`);
                 mqttService.publish('rfid/secret_updated', {
                     uid: uid,
@@ -82,7 +74,6 @@ async function handleSecretUpdate(data) {
                     success: true,
                     timestamp: new Date().toISOString()
                 });
-            }
         } catch (error) {
             logger.error(`Failed to update secret for tag ${uid}: ${error.message}`);
             mqttService.publish('rfid/secret_updated', {
@@ -93,6 +84,9 @@ async function handleSecretUpdate(data) {
                 timestamp: new Date().toISOString()
             });
         }
+    }
+    else {
+        logger.warn(`Secret update failed for tag ${uid} on reader ${reader_name}: ${error}`);
     }
 }
 
@@ -109,7 +103,7 @@ function handleEnrollmentScan(uid, reader_name, data = {}) {
     if (!secretWritten || !secret) {
         logger.warn(`ESP32 failed to write secret for card ${uid}, enrollment may not be secure`);
     } else {
-        logger.info(`Using secret from ESP32 for card ${uid}: ${secret}`);
+        logger.info(`Using secret from ESP32 for card ${uid} (secret present: true)`);
     }
     mqttService.publish('rfid/enrolled', {
         reader_name: reader_name,
@@ -123,47 +117,50 @@ function handleEnrollmentScan(uid, reader_name, data = {}) {
     sessionManager.endSession(reader_name);
 }
 
-async function handleAccessScan(uid, reader_name, secret = null) {
-    logger.info(`Access scan: ${uid} na czytnika ${reader_name}, hasSecret: ${!!secret}`);
-    const response = await checkAccess(uid, reader_name, secret);
-    mqttService.publish('rfid/access', {
-        response: response,
+async function handleAccessScan(uid, reader_name, current_secret = null, new_secret = null) {
+    logger.info(`Access scan: ${uid} na czytnika ${reader_name}, hasSecret: ${!!current_secret}`);
+    const apiResp = await checkAccess(uid, reader_name, current_secret, new_secret);
+    const respStr = apiResp && apiResp.response ? apiResp.response : 'DENIED';
+    const payload = {
+        response: respStr,
         uid: uid,
         reader_name: reader_name,
         timestamp: new Date().toISOString()
-    });
-    logger.info(`Wysłano odpowiedź dostępu dla ${uid}: ${response}`);
+    };
+    // Forward secret to device if backend provided one
+    if (apiResp && apiResp.secret) payload.secret = apiResp.secret;
+
+    mqttService.publish('rfid/access', payload);
+    logger.info(`Wysłano odpowiedź dostępu dla ${uid}: ${JSON.stringify(payload)}`);
 }
 
-async function checkAccess(uid, reader_name, secret = null) {
+async function checkAccess(uid, reader_name, current_secret = null, new_secret = null) {
     if (deniedTags.includes(uid)) {
         logger.info(`Tag ${uid} znajduje się na liście odmowy dostępu`);
         return "DENIED";
     }
     try {
         let url = `${apiBaseUrl}/tags/check-access/${uid}`;
-        if (secret) {
-            url += `?secret=${encodeURIComponent(secret)}`;
-        }
         const response = await axios.get(url, {
             headers: {
                 'content-type': 'application/json',
                 'x-controller-request': 'true',
                 'x-mqtt-api-key': process.env.CONTROLLER_API_KEY,
                 reader_name: reader_name,
-                secret: encodeURIComponent(secret)
+                current_secret: encodeURIComponent(current_secret),
+                new_secret: encodeURIComponent(new_secret)
             }
         });
-        if (response.data && response.data.response === "ALLOW") {
-            logger.info(`Tag ${uid} ma dostęp (sprawdzono przez API)`);
-            return "ALLOW";
+        if (response.data) {
+            logger.info(`Tag ${uid} sprawdzony przez API: ${JSON.stringify(response.data)}`);
+            return response.data;
         } else {
-            logger.info(`Tag ${uid} nie ma dostępu (sprawdzono przez API)`);
-            return "DENIED";
+            logger.info(`Tag ${uid} - brak danych z API`);
+            return { response: 'DENIED' };
         }
     } catch (error) {
         logger.error(`Błąd podczas sprawdzania dostępu dla tagu ${uid}: ${error.message}`);
-        return "DENIED";
+        return { response: 'DENIED' };
     }
 }
 
@@ -211,9 +208,7 @@ function handleStatus(data) {
         logger.warn('Brak device_id w statusie czytnika');
         return;
     }
-    
-    logger.info(`Status czytnika: ${reader_name} (${device_id}) - ${status}, FW: ${firmware_version}, IP: ${ip}`);
-    
+
     // Rejestruj czytnik w registry
     readerRegistry.registerReader({
         device_id,
@@ -223,7 +218,6 @@ function handleStatus(data) {
         status
     });
     
-    logger.info(`Czytnik zarejestrowany, aktualnie w registry: ${readerRegistry.getAllReaders().length} czytników`);
 }
 
 module.exports = {
