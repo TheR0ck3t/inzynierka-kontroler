@@ -10,16 +10,17 @@ rfidHandler.init(mqttService, sessionManager);
 
 // Rejestracja handlerów dla różnych tematów MQTT
 mqttService.registerHandler('rfid/command', (data) => {
-    rfidHandler.handleCommand(data);
+    rfidHandler.handleCommand(data); // Obsługa komend, np. start_enrollment
 });
 mqttService.registerHandler('rfid/scan', (data) => {
-    rfidHandler.handleRfidScan(data);
+    rfidHandler.handleRfidScan(data); // Obsługa skanów RFID
 });
 mqttService.registerHandler('rfid/secret_update', (data) => {
-    rfidHandler.handleSecretUpdate(data);
+    rfidHandler.handleSecretUpdate(data); // Obsługa aktualizacji sekretów (potwierdzenia rotacji)
 });
 mqttService.registerHandler('rfid/status', (data) => {
-    rfidHandler.handleStatus(data);
+    rfidHandler.handleStatus(data); // Obsługa statusów czytników (opcjonalnie, 
+                                    // jeśli czytniki wysyłają takie informacje)
 });
 
 logger.info('Kontroler RFID został zainicjalizowany pomyślnie');

@@ -139,17 +139,21 @@ async function checkAccess(uid, reader_name, current_secret = null, new_secret =
         logger.info(`Tag ${uid} znajduje się na liście odmowy dostępu`);
         return "DENIED";
     }
+    
     try {
-        let url = `${apiBaseUrl}/tags/check-access/${uid}`;
-        const response = await axios.get(url, {
+        let url = `${apiBaseUrl}/tags/check-access/${uid}`; // Endpoint API do sprawdzania dostępu dla tagu
+        const accessData = { //
+        reader_name: reader_name,
+        current_secret: current_secret,
+        new_secret: new_secret
+        };
+        const response = await axios.get(url, { //
             headers: {
-                'content-type': 'application/json',
-                'x-controller-request': 'true',
-                'x-mqtt-api-key': process.env.CONTROLLER_API_KEY,
-                reader_name: reader_name,
-                current_secret: encodeURIComponent(current_secret),
-                new_secret: encodeURIComponent(new_secret)
-            }
+                'content-type': 'application/json', 
+                'x-controller-request': 'true', // Nagłówek informujący backend, że to żądanie z kontrolera
+                'x-mqtt-api-key': process.env.CONTROLLER_API_KEY, // Klucz API do autoryzacji kontrolera
+            },
+            params: accessData, // Przekazanie danych jako query parameters
         });
         if (response.data) {
             logger.info(`Tag ${uid} sprawdzony przez API: ${JSON.stringify(response.data)}`);
